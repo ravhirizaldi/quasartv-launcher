@@ -150,6 +150,19 @@ fun buildHomeScreen(
     }
 
     val inputRow = root.findViewById<LinearLayout>(R.id.home_inputs)
+    populateHomeInputs(context, inputRow, inputResult, callbacks, motionPreference)
+    return root
+}
+
+/** Rebuilds only the input shelf so connection changes do not recreate the whole Home screen. */
+fun populateHomeInputs(
+    context: Context,
+    inputRow: LinearLayout,
+    inputResult: InputCatalog.Result?,
+    callbacks: LauncherUiCallbacks,
+    motionPreference: MotionPreference
+) {
+    inputRow.removeAllViews()
     val sources = inputResult.sources()
     if (sources.isEmpty()) {
         inputRow.addView(TextView(context).apply {
@@ -179,5 +192,4 @@ fun buildHomeScreen(
             addView(chips)
         }, LinearLayout.LayoutParams(0, context.dp(98f), 1f))
     }
-    return root
 }

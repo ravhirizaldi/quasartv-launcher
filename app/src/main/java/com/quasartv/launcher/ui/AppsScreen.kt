@@ -55,6 +55,7 @@ fun buildAppsScreen(
     }
     val favoriteOrder = favoritePackages.toList()
     val favoriteSet = favoriteOrder.toSet()
+    val favoriteIndices = favoriteOrder.withIndex().associate { (index, packageName) -> packageName to index }
 
     content.addView(pageTitle(context,
         if (favoriteSelectionMode) "Choose your favorites" else "Your apps",
@@ -176,7 +177,7 @@ fun buildAppsScreen(
             content.addView(row)
         }
         val row = rows.last()
-        val favoriteIndex = favoriteOrder.indexOf(app.packageName)
+        val favoriteIndex = favoriteIndices[app.packageName] ?: -1
         val isFavorite = app.packageName in favoriteSet
         val card = FocusLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -273,6 +274,7 @@ fun buildAppsScreen(
         })
     }
 
+    val rowCount = (cards.size + columns - 1) / columns
     cards.forEachIndexed { index, card ->
         val rowIndex = index / columns
         val columnIndex = index % columns
@@ -289,7 +291,6 @@ fun buildAppsScreen(
             card.nextFocusUpId = ensureViewId(cards[previousIndex])
         }
         val nextRow = rowIndex + 1
-        val rowCount = (cards.size + columns - 1) / columns
         if (nextRow < rowCount) {
             val nextStart = nextRow * columns
             val nextEnd = minOf(cards.lastIndex, nextStart + columns - 1)

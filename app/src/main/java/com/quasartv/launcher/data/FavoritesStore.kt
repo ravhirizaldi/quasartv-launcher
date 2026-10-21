@@ -71,7 +71,8 @@ class FavoritesStore(private val preferences: SharedPreferences) {
         } else {
             editor.putString(KEY_FAVORITES, favorites.joinToString(SEPARATOR))
         }
-        editor.commit()
+        // apply() updates the in-memory value immediately and writes to disk off the UI thread.
+        editor.apply()
     }
 
     private fun normalizePackageName(packageName: String): String? {

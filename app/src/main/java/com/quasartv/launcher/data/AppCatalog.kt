@@ -20,25 +20,42 @@ class AppCatalog(
 ) {
     constructor(context: Context) : this(context.packageManager, context.packageName)
 
+    private val appCache = HashMap<String, CachedApp>()
+
     fun discover(): List<AppRecord> {
-        val candidates = ArrayList<Candidate>()
-        candidates += query(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER))
-        candidates += query(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))
+        val rawCandidates = ArrayList<RawCandidate>()
+        rawCandidates += query(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER))
+        rawCandidates += query(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))
+
+        // Both platform queries commonly return the same activity. Drop duplicates before any
+        // label or icon work so package resources are touched once per launchable activity.
+        val seenActivities = HashSet<String>()
+        val candidates = rawCandidates.mapNotNull { raw ->
+            if (!seenActivities.add(raw.packageName + '\u0000' + raw.activityName)) {
+                null
+            } else {
+                candidate(raw)
+            }
+        }
 
         val records = LinkedHashMap<String, AppRecord>()
         candidates
-            .sortedWith(compareBy<Candidate>({ it.packageName }, { it.activityName }, { it.label }))
+            .sortedWith(compareBy<Candidate>({ it.packageName }, { it.activityName }))
             .forEach { candidate ->
                 if (records.containsKey(candidate.packageName)) return@forEach
                 val launchIntent = candidate.launchIntent ?: return@forEach
+                val cached = cachedApp(candidate)
                 records[candidate.packageName] = AppRecord(
-                    label = candidate.label,
+                    label = cached.label,
                     packageName = candidate.packageName,
                     launchIntent = launchIntent,
-                    icon = candidate.icon,
+                    icon = cached.icon,
                     favoriteEligible = candidate.packageName != launcherPackageName
                 )
             }
+
+        // Do not retain artwork for packages that were uninstalled.
+        appCache.keys.retainAll(records.keys)
 
         return records.values
             .filter { it.packageName != launcherPackageName }
@@ -52,12 +69,10 @@ class AppCatalog(
 
         val intent = Intent(app.launchIntent)
         return try {
-            if (context.packageManager.resolveActivity(intent, 0) == null) {
-                LaunchResult.Unavailable("App is no longer available.", app.packageName)
-            } else {
-                context.startActivity(intent)
-                LaunchResult.Success(app.packageName)
-            }
+            // startActivity already performs resolution; a separate resolveActivity call only
+            // adds a binder round trip to every launch.
+            context.startActivity(intent)
+            LaunchResult.Success(app.packageName)
         } catch (error: ActivityNotFoundException) {
             LaunchResult.Unavailable("App is no longer available.", app.packageName)
         } catch (error: SecurityException) {
@@ -67,17 +82,17 @@ class AppCatalog(
         }
     }
 
-    private fun query(intent: Intent): List<Candidate> {
+    private fun query(intent: Intent): List<RawCandidate> {
         val resolved = try {
             packageManager.queryIntentActivities(intent, 0)
         } catch (_: RuntimeException) {
             return emptyList()
         }
 
-        return resolved.orEmpty().mapNotNull { resolveInfo -> candidate(resolveInfo, intent) }
+        return resolved.orEmpty().mapNotNull { resolveInfo -> rawCandidate(resolveInfo, intent) }
     }
 
-    private fun candidate(resolveInfo: ResolveInfo, queryIntent: Intent): Candidate? {
+    private fun rawCandidate(resolveInfo: ResolveInfo, queryIntent: Intent): RawCandidate? {
         val activityInfo = try {
             resolveInfo.activityInfo
         } catch (_: RuntimeException) {
@@ -94,24 +109,26 @@ class AppCatalog(
         } catch (_: RuntimeException) {
             null
         } ?: return null
-        val launchIntent = try {
-            packageManager.getLeanbackLaunchIntentForPackage(packageName)
-                ?: packageManager.getLaunchIntentForPackage(packageName)
-        } catch (_: RuntimeException) {
-            null
-        } ?: try {
-            Intent(queryIntent).setComponent(ComponentName(packageName, activityName))
-        } catch (_: RuntimeException) {
-            null
-        }
         val applicationInfo = try {
             activityInfo.applicationInfo
         } catch (_: RuntimeException) {
             null
         }
-        val label = loadLabel(resolveInfo, applicationInfo, packageName)
-        val icon = loadIcon(resolveInfo, applicationInfo)?.let(::boundedIcon)
-        return Candidate(packageName, activityName, label, launchIntent, icon)
+        return RawCandidate(packageName, activityName, queryIntent, resolveInfo, applicationInfo)
+    }
+
+    private fun candidate(raw: RawCandidate): Candidate {
+        val launchIntent = try {
+            packageManager.getLeanbackLaunchIntentForPackage(raw.packageName)
+                ?: packageManager.getLaunchIntentForPackage(raw.packageName)
+        } catch (_: RuntimeException) {
+            null
+        } ?: try {
+            Intent(raw.queryIntent).setComponent(ComponentName(raw.packageName, raw.activityName))
+        } catch (_: RuntimeException) {
+            null
+        }
+        return Candidate(raw.packageName, raw.activityName, launchIntent, raw.resolveInfo, raw.applicationInfo)
     }
 
     private fun loadLabel(
@@ -132,6 +149,28 @@ class AppCatalog(
             null
         }
         return applicationLabel ?: packageName
+    }
+
+    private fun cachedApp(candidate: Candidate): CachedApp {
+        // A new install path is issued when an app is updated, so it invalidates stale artwork.
+        val sourceDir = candidate.applicationInfo?.sourceDir
+            ?: candidate.applicationInfo?.publicSourceDir
+        val locale = Locale.getDefault().toLanguageTag()
+        appCache[candidate.packageName]?.let { cached ->
+            if (cached.activityName == candidate.activityName &&
+                cached.sourceDir == sourceDir &&
+                cached.locale == locale
+            ) {
+                return cached
+            }
+        }
+        return CachedApp(
+            activityName = candidate.activityName,
+            sourceDir = sourceDir,
+            locale = locale,
+            label = loadLabel(candidate.resolveInfo, candidate.applicationInfo, candidate.packageName),
+            icon = loadIcon(candidate.resolveInfo, candidate.applicationInfo)?.let(::boundedIcon)
+        ).also { appCache[candidate.packageName] = it }
     }
 
     private fun loadIcon(
@@ -177,12 +216,28 @@ class AppCatalog(
         val favoriteEligible: Boolean
     )
 
+    private data class CachedApp(
+        val activityName: String,
+        val sourceDir: String?,
+        val locale: String,
+        val label: String,
+        val icon: Drawable?
+    )
+
+    private data class RawCandidate(
+        val packageName: String,
+        val activityName: String,
+        val queryIntent: Intent,
+        val resolveInfo: ResolveInfo,
+        val applicationInfo: ApplicationInfo?
+    )
+
     private data class Candidate(
         val packageName: String,
         val activityName: String,
-        val label: String,
         val launchIntent: Intent?,
-        val icon: Drawable?
+        val resolveInfo: ResolveInfo,
+        val applicationInfo: ApplicationInfo?
     )
 
     companion object {

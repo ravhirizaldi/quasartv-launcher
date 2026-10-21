@@ -3,6 +3,7 @@ package com.quasartv.launcher.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.PixelFormat
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Handler
@@ -51,7 +52,7 @@ class AppArtworkLoader(context: Context) {
             } ?: return@submit
             if (Thread.currentThread().isInterrupted) return@submit
             val (width, height) = artworkSize(source.intrinsicWidth, source.intrinsicHeight, maxWidth, maxHeight)
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val bitmap = Bitmap.createBitmap(width, height, artworkConfig(source))
             source.setBounds(0, 0, width, height)
             source.draw(Canvas(bitmap))
             val drawable = BitmapDrawable(null, bitmap).apply { isFilterBitmap = true }
@@ -73,6 +74,11 @@ class AppArtworkLoader(context: Context) {
         worker.shutdownNow()
     }
 }
+
+@Suppress("DEPRECATION")
+private fun artworkConfig(source: Drawable): Bitmap.Config =
+    // Most TV banners are fully opaque; RGB_565 keeps them at half the cache cost.
+    if (source.opacity == PixelFormat.OPAQUE) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
 
 internal fun artworkSize(width: Int, height: Int, maxWidth: Int, maxHeight: Int): Pair<Int, Int> {
     val sourceWidth = width.coerceAtLeast(1)

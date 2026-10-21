@@ -17,6 +17,7 @@ import android.view.ViewTreeObserver
 import android.view.KeyEvent
 import android.widget.ImageButton
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.quasartv.launcher.data.AppCatalog
 import com.quasartv.launcher.data.AppArtworkLoader
@@ -37,6 +38,7 @@ import com.quasartv.launcher.ui.buildSettingsScreen
 import com.quasartv.launcher.ui.inputContentDescription
 import com.quasartv.launcher.ui.applyFocusStyle
 import com.quasartv.launcher.ui.dp
+import com.quasartv.launcher.ui.populateHomeInputs
 import java.util.Date
 
 class MainActivity : Activity() {
@@ -65,11 +67,17 @@ class MainActivity : Activity() {
 
     private var featuredAppPackage: String? = null
     private var initialRestorePending = true
-    private var refreshInFlight = false
-    private var refreshGeneration = 0
-    private var refreshThread: Thread? = null
+    private var appRefreshInFlight = false
+    private var appRefreshGeneration = 0
+    private var appRefreshThread: Thread? = null
+    private var inputRefreshInFlight = false
+    private var inputRefreshQueued = false
+    private var inputRefreshGeneration = 0
+    private var inputRefreshThread: Thread? = null
     private var destroyed = false
     private var focusGeneration = 0
+    private var pendingFocus: FocusState? = null
+    private var persistedFocus: FocusState? = null
 
     private val inputCallback = object : TvInputManager.TvInputCallback() {
         override fun onInputStateChanged(inputId: String, state: Int) {
@@ -79,12 +87,13 @@ class MainActivity : Activity() {
             inputResult = current.copy(sources = current.sources.map {
                 if (it.inputId == inputId) it.copy(connectionState = connection) else it
             })
-            renderDestination(preserveHeaderFocus = true)
+            // Connection changes only affect the input shelf; keep the rest of Home intact.
+            refreshHomeInputs()
         }
 
-        override fun onInputAdded(inputId: String) = refreshData()
-        override fun onInputRemoved(inputId: String) = refreshData()
-        override fun onInputUpdated(inputId: String) = refreshData()
+        override fun onInputAdded(inputId: String) = refreshInputs()
+        override fun onInputRemoved(inputId: String) = refreshInputs()
+        override fun onInputUpdated(inputId: String) = refreshInputs()
     }
 
     private val uiCallbacks = object : LauncherUiCallbacks {
@@ -114,6 +123,8 @@ class MainActivity : Activity() {
         }
     }
 
+    private val focusPersistRunnable = Runnable { flushFocusPersist() }
+
     private val focusChangeListener =
         ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
             focusGeneration++
@@ -140,6 +151,7 @@ class MainActivity : Activity() {
         }
 
         preferences = LauncherPreferences(this)
+        persistedFocus = preferences.lastFocus
         appCatalog = AppCatalog(this)
         inputCatalog = InputCatalog(this)
         tvInputManager = getSystemService(TV_INPUT_SERVICE) as? TvInputManager
@@ -171,6 +183,7 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        flushFocusPersist()
         mainHandler.removeCallbacks(clockRunnable)
         super.onPause()
     }
@@ -194,9 +207,13 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         destroyed = true
-        refreshGeneration += 1
-        refreshThread?.interrupt()
-        refreshThread = null
+        flushFocusPersist()
+        appRefreshGeneration += 1
+        inputRefreshGeneration += 1
+        appRefreshThread?.interrupt()
+        appRefreshThread = null
+        inputRefreshThread?.interrupt()
+        inputRefreshThread = null
         if (::artworkLoader.isInitialized) artworkLoader.close()
         mainHandler.removeCallbacksAndMessages(null)
         if (::rootView.isInitialized && rootView.viewTreeObserver.isAlive) {
@@ -298,7 +315,7 @@ class MainActivity : Activity() {
                 discovery = appDiscovery,
                 motionPreference = settingsState.motion,
                 artworkLoader = artworkLoader,
-                initialFeaturedPackage = featuredAppPackage ?: preferences.lastFocus.packageName
+                initialFeaturedPackage = featuredAppPackage ?: storedFocus().packageName
             )
         }
         val previousScreen = contentContainer.getChildAt(0)
@@ -338,12 +355,16 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun inputSources(): List<InputSource> = when (val result = inputResult) {
+    private fun inputSources(): List<InputSource> = sourcesOf(inputResult)
+
+    private fun sourcesOf(result: InputCatalog.Result?): List<InputSource> = when (result) {
         is InputCatalog.Result.Success -> result.sources
         is InputCatalog.Result.Unsupported -> result.sources
         is InputCatalog.Result.Failed -> emptyList()
         null -> emptyList()
     }
+
+    private fun storedFocus(): FocusState = pendingFocus ?: preferences.lastFocus
 
     private fun updateSettings(state: SettingsState) {
         settingsState = state.copy(lastDestination = currentDestination)
@@ -387,7 +408,7 @@ class MainActivity : Activity() {
     }
 
     private fun launchApp(app: AppCatalog.AppRecord) {
-        preferences.lastFocus = FocusState(app.packageName)
+        persistFocusImmediately(FocusState(app.packageName))
         when (val result = appCatalog.launch(this, app)) {
             is LaunchResult.Success -> {
                 lastLaunchedPackage = result.packageName
@@ -422,7 +443,7 @@ class MainActivity : Activity() {
             return
         }
 
-        preferences.lastFocus = FocusState(source.inputId, source.inputId)
+        persistFocusImmediately(FocusState(source.inputId, source.inputId))
         try {
             startActivity(intent)
         } catch (_: ActivityNotFoundException) {
@@ -500,9 +521,14 @@ class MainActivity : Activity() {
     }
 
     private fun refreshData() {
-        if (destroyed || refreshInFlight) return
-        refreshInFlight = true
-        val generation = ++refreshGeneration
+        refreshApps()
+        refreshInputs()
+    }
+
+    private fun refreshApps() {
+        if (destroyed || appRefreshInFlight) return
+        appRefreshInFlight = true
+        val generation = ++appRefreshGeneration
         val preserveHeaderFocus = appDiscovery !is AppDiscoveryState.Loading
         if (appDiscovery is AppDiscoveryState.Loading) renderDestination()
         val thread = Thread {
@@ -511,44 +537,123 @@ class MainActivity : Activity() {
             } catch (_: RuntimeException) {
                 AppDiscoveryState.Failed("Unable to discover apps.")
             }
+            mainHandler.post {
+                if (destroyed || generation != appRefreshGeneration) return@post
+                appRefreshThread = null
+                appRefreshInFlight = false
+                val shouldRender = applyAppDiscovery(apps)
+                restoreInitialDestination()
+                // Settings does not consume the app catalog; leave it untouched.
+                if (shouldRender && currentDestination != LauncherDefaults.DESTINATION_SETTINGS) {
+                    renderDestination(preserveHeaderFocus = preserveHeaderFocus)
+                }
+            }
+        }.apply { name = "QuasarTV-app-discovery" }
+        appRefreshThread = thread
+        thread.start()
+    }
+
+    private fun refreshInputs() {
+        if (destroyed) return
+        if (inputRefreshInFlight) {
+            // A TV input was added or removed while a scan was running; scan again when it lands.
+            inputRefreshQueued = true
+            return
+        }
+        inputRefreshInFlight = true
+        val generation = ++inputRefreshGeneration
+        val thread = Thread {
             val inputs = try {
                 inputCatalog.discover()
             } catch (error: RuntimeException) {
                 InputCatalog.Result.Failed("Unable to discover TV inputs.", null, error)
             }
             mainHandler.post {
-                if (destroyed || generation != refreshGeneration) return@post
-                refreshThread = null
-                refreshInFlight = false
-                appDiscovery = apps
-                when (apps) {
-                    is AppDiscoveryState.Success -> {
-                        discoveredApps = apps.apps
-                        preferences.favorites.trimStale(apps.apps.map { it.packageName })
-                    }
-
-                    is AppDiscoveryState.Failed -> {
-                        discoveredApps = emptyList()
-                    }
-
-                    AppDiscoveryState.Loading -> {
-                        discoveredApps = emptyList()
-                    }
-                }
+                if (destroyed || generation != inputRefreshGeneration) return@post
+                inputRefreshThread = null
+                inputRefreshInFlight = false
+                val previous = inputResult
                 inputResult = inputs
-                if (initialRestorePending) {
-                    initialRestorePending = false
-                    val storedDestination = preferences.lastDestination
-                    currentDestination = storedDestination.takeIf(::destinationAvailable)
-                        ?: LauncherDefaults.DESTINATION_HOME
-                    settingsState = preferences.settings.copy(lastDestination = currentDestination)
-                    preferences.lastDestination = currentDestination
+                if (inputStateChanged(previous, inputs) &&
+                    currentDestination == LauncherDefaults.DESTINATION_HOME
+                ) {
+                    refreshHomeInputs()
                 }
-                renderDestination(preserveHeaderFocus = preserveHeaderFocus)
+                if (inputRefreshQueued) {
+                    inputRefreshQueued = false
+                    refreshInputs()
+                }
             }
-        }.apply { name = "QuasarTV-discovery" }
-        refreshThread = thread
+        }.apply { name = "QuasarTV-input-discovery" }
+        inputRefreshThread = thread
         thread.start()
+    }
+
+    private fun inputStateChanged(previous: InputCatalog.Result?, next: InputCatalog.Result): Boolean {
+        if (previous == null || previous::class != next::class) return true
+        if (sourcesOf(previous) != sourcesOf(next)) return true
+        return when {
+            previous is InputCatalog.Result.Failed && next is InputCatalog.Result.Failed ->
+                previous.reason != next.reason
+
+            previous is InputCatalog.Result.Unsupported && next is InputCatalog.Result.Unsupported ->
+                previous.reason != next.reason
+
+            else -> false
+        }
+    }
+
+    /** Applies discovery only when the visible catalog actually changed. */
+    private fun applyAppDiscovery(state: AppDiscoveryState): Boolean {
+        val previous = appDiscovery
+        appDiscovery = state
+        when (state) {
+            is AppDiscoveryState.Success -> {
+                val apps = state.apps
+                val changed = apps.size != discoveredApps.size || apps.indices.any { index ->
+                    val current = apps[index]
+                    val old = discoveredApps[index]
+                    current.packageName != old.packageName ||
+                        current.label != old.label ||
+                        current.launchIntent.component != old.launchIntent.component ||
+                        current.icon !== old.icon
+                }
+                discoveredApps = apps
+                preferences.favorites.trimStale(apps.map { it.packageName })
+                return changed || previous !is AppDiscoveryState.Success
+            }
+
+            is AppDiscoveryState.Failed -> {
+                discoveredApps = emptyList()
+                return previous !is AppDiscoveryState.Failed
+            }
+
+            AppDiscoveryState.Loading -> {
+                discoveredApps = emptyList()
+                return previous !is AppDiscoveryState.Loading
+            }
+        }
+    }
+
+    private fun restoreInitialDestination() {
+        if (!initialRestorePending) return
+        initialRestorePending = false
+        val storedDestination = preferences.lastDestination
+        currentDestination = storedDestination.takeIf(::destinationAvailable)
+            ?: LauncherDefaults.DESTINATION_HOME
+        settingsState = preferences.settings.copy(lastDestination = currentDestination)
+        preferences.lastDestination = currentDestination
+    }
+
+    private fun refreshHomeInputs() {
+        if (destroyed || currentDestination != LauncherDefaults.DESTINATION_HOME) return
+        val inputRow = contentContainer.findViewById<LinearLayout>(R.id.home_inputs) ?: return
+        val focusedTag = inputRow.findFocus()?.tag as? String
+        populateHomeInputs(this, inputRow, inputResult, uiCallbacks, settingsState.motion)
+        if (focusedTag != null) {
+            val restored = inputRow.findViewWithTag<View>(focusedTag)?.requestFocus() == true
+            if (!restored) focusContent()
+        }
     }
 
     private fun destinationAvailable(destination: String): Boolean = when (destination) {
@@ -562,13 +667,13 @@ class MainActivity : Activity() {
 
     private fun restoreFocusIfPossible(root: View = contentContainer): Boolean {
         if (destroyed || !::contentContainer.isInitialized) return false
-        val storedFocus = preferences.lastFocus
+        val focus = storedFocus()
         val appTarget = if (
             currentDestination == LauncherDefaults.DESTINATION_HOME ||
             currentDestination == LauncherDefaults.DESTINATION_APPS
         ) {
             val packageName = lastLaunchedPackage
-                ?: storedFocus.packageName.takeIf { storedFocus.source == null }
+                ?: focus.packageName.takeIf { focus.source == null }
             packageName?.let { packageToFind ->
                 findFocusableView(root) { view ->
                     view.tag == packageToFind
@@ -581,7 +686,7 @@ class MainActivity : Activity() {
             currentDestination == LauncherDefaults.DESTINATION_HOME ||
             currentDestination == LauncherDefaults.DESTINATION_INPUTS
         ) {
-            storedFocus.source?.let { sourceId ->
+            focus.source?.let { sourceId ->
                 val source = inputSources().firstOrNull { it.inputId == sourceId }
                 source?.let { inputToFind ->
                     findFocusableView(root) { view ->
@@ -630,7 +735,7 @@ class MainActivity : Activity() {
                 app.packageName == appPackage
             }?.let { app ->
                 if (currentDestination == LauncherDefaults.DESTINATION_HOME) featuredAppPackage = app.packageName
-                preferences.lastFocus = FocusState(app.packageName)
+                queueFocusPersist(FocusState(app.packageName))
                 return
             }
         }
@@ -641,9 +746,35 @@ class MainActivity : Activity() {
             inputSources().firstOrNull { source ->
                 description.startsWith(inputContentDescription(source))
             }?.let { source ->
-                preferences.lastFocus = FocusState(source.inputId, source.inputId)
+                queueFocusPersist(FocusState(source.inputId, source.inputId))
             }
         }
+    }
+
+    /**
+     * D-pad focus can move several times per second. Keep only the newest target and let a short
+     * quiet period collapse the writes into one.
+     */
+    private fun queueFocusPersist(focus: FocusState) {
+        if (focus == pendingFocus || (pendingFocus == null && focus == persistedFocus)) return
+        pendingFocus = focus
+        mainHandler.removeCallbacks(focusPersistRunnable)
+        mainHandler.postDelayed(focusPersistRunnable, FOCUS_PERSIST_DELAY_MS)
+    }
+
+    private fun persistFocusImmediately(focus: FocusState) {
+        pendingFocus = focus
+        flushFocusPersist()
+    }
+
+    private fun flushFocusPersist() {
+        if (!::preferences.isInitialized) return
+        mainHandler.removeCallbacks(focusPersistRunnable)
+        val focus = pendingFocus ?: return
+        pendingFocus = null
+        if (focus == persistedFocus) return
+        persistedFocus = focus
+        preferences.lastFocus = focus
     }
 
     private fun updateClock() {
@@ -663,5 +794,9 @@ class MainActivity : Activity() {
 
     private fun logFailure(message: String) {
         Log.w("QuasarTV", message)
+    }
+
+    private companion object {
+        const val FOCUS_PERSIST_DELAY_MS = 150L
     }
 }
