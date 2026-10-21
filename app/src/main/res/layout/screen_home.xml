@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:clipChildren="false" android:clipToPadding="false"
+    android:paddingTop="12dp" android:paddingStart="8dp"
+    android:paddingEnd="@dimen/home_content_end_inset" android:paddingBottom="8dp">
+        <LinearLayout
+            android:id="@+id/featured_region"
+            android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+            android:orientation="horizontal" android:baselineAligned="false" android:gravity="center_vertical" android:clipChildren="false">
+            <LinearLayout
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginEnd="28dp" android:orientation="vertical" android:gravity="center_vertical"
+                android:clipChildren="false" android:clipToPadding="false">
+                <TextView
+                    android:id="@+id/featured_title"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium" android:textSize="@dimen/text_hero"
+                    android:textColor="@color/color_warm_ivory_text" android:includeFontPadding="false"
+                    android:maxLines="2" android:ellipsize="end" android:accessibilityHeading="true" />
+                <TextView
+                    android:id="@+id/featured_subtitle"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp" android:includeFontPadding="false"
+                    android:textSize="16sp" android:textColor="@color/color_muted_text" />
+                <TextView
+                    android:id="@+id/empty_action"
+                    android:layout_width="wrap_content" android:layout_height="48dp"
+                    android:layout_marginTop="18dp" android:paddingHorizontal="20dp"
+                    android:gravity="center" android:fontFamily="sans-serif-medium"
+                    android:textSize="16sp" android:textColor="@color/color_warm_ivory_text"
+                    android:visibility="gone"
+                    android:drawablePadding="10dp" />
+            </LinearLayout>
+            <ImageView
+                android:id="@+id/featured_artwork"
+                android:layout_width="wrap_content" android:layout_height="match_parent"
+                android:maxWidth="264dp" android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:importantForAccessibility="no" />
+        </LinearLayout>
+        <TextView
+            android:id="@+id/favorites_heading"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:layout_marginBottom="8dp"
+            android:includeFontPadding="false" android:fontFamily="sans-serif-medium"
+            android:text="@string/favorites" android:textSize="@dimen/text_section"
+            android:textColor="@color/color_warm_ivory_text" android:accessibilityHeading="true" />
+        <HorizontalScrollView
+            android:id="@+id/favorites_scroll"
+            android:layout_width="match_parent" android:layout_height="112dp"
+            android:clipToPadding="true" android:clipChildren="true" android:paddingHorizontal="6dp" android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/favorites_row"
+                android:layout_width="wrap_content" android:layout_height="match_parent"
+                android:orientation="horizontal" android:gravity="center_vertical"
+                android:clipChildren="false" android:clipToPadding="false" android:paddingHorizontal="4dp" android:paddingVertical="4dp" />
+        </HorizontalScrollView>
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:layout_marginTop="18dp" android:background="@color/color_outline" />
+        <LinearLayout
+            android:id="@+id/home_inputs"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:orientation="horizontal"
+            android:gravity="center_vertical" android:clipChildren="false">
+        </LinearLayout>
+</LinearLayout>

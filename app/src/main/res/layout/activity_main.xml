@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/activity_main"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/color_midnight_background" android:clipChildren="false">
+    <LinearLayout
+        android:id="@+id/content_panel"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:clipChildren="false" android:clipToPadding="false"
+        android:padding="@dimen/tv_safe_screen_gutter">
+        <LinearLayout
+            android:id="@+id/top_information"
+            android:layout_width="match_parent" android:layout_height="48dp"
+            android:orientation="horizontal" android:gravity="center_vertical|end"
+            android:paddingEnd="@dimen/home_content_end_inset"
+            android:clipChildren="false">
+            <ImageButton
+                android:id="@+id/launcher_settings"
+                android:layout_width="48dp" android:layout_height="48dp"
+                android:layout_marginEnd="12dp" android:padding="13dp"
+                android:src="@drawable/patchwall_info" android:tint="@color/color_warm_ivory_text"
+                android:scaleType="fitCenter"
+                android:contentDescription="Launcher settings"
+                android:nextFocusLeft="@id/launcher_settings"
+                android:nextFocusRight="@id/tv_settings"
+                android:focusable="true" android:focusableInTouchMode="true" />
+            <ImageButton
+                android:id="@+id/tv_settings"
+                android:layout_width="48dp" android:layout_height="48dp"
+                android:layout_marginEnd="20dp" android:padding="13dp"
+                android:src="@drawable/patchwall_settings" android:tint="@color/color_warm_ivory_text"
+                android:scaleType="fitCenter"
+                android:contentDescription="TV settings"
+                android:nextFocusLeft="@id/launcher_settings"
+                android:nextFocusRight="@id/tv_settings"
+                android:focusable="true" android:focusableInTouchMode="true" />
+            <LinearLayout
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:orientation="vertical" android:gravity="end">
+                <TextView
+                    android:id="@+id/clock_date_region"
+                    style="@style/Theme.QuasarTV.ClockText"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                <TextView
+                    android:id="@+id/date_region"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" android:includeFontPadding="false"
+                    android:textColor="@color/color_muted_text" android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+        <View
+            android:id="@+id/header_shadow"
+            android:layout_width="match_parent" android:layout_height="@dimen/scroll_header_gap"
+            android:background="@drawable/header_shadow"
+            android:importantForAccessibility="no" android:visibility="gone" />
+        <FrameLayout
+            android:id="@+id/main_content_container"
+            android:layout_width="match_parent" android:layout_height="0dp"
+            android:layout_weight="1" android:clipChildren="false"
+            android:clipToPadding="false" android:importantForAccessibility="no" />
+    </LinearLayout>
+</FrameLayout>

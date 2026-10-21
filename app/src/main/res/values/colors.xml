@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="color_midnight_background">#0C111B</color>
+    <color name="color_deep_plum_background">#171521</color>
+    <color name="color_ember_night_background">#1D1715</color>
+    <color name="color_plum_surface">#1B2330</color>
+    <color name="color_surface_lift">#283447</color>
+    <color name="color_warm_ivory_text">#F4F1EA</color>
+    <color name="color_muted_text">#A8B2C2</color>
+    <color name="color_ember_primary">#D8AA62</color>
+    <color name="color_ember_focus">#F1C780</color>
+    <color name="color_brass_metadata">#D2B37F</color>
+    <color name="color_outline">#333F50</color>
+    <color name="color_disabled">#A1A9B7</color>
+    <color name="color_error">#EF8D8A</color>
+    <color name="color_success">#9CCB9D</color>
+</resources>

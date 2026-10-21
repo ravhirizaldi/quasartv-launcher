@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/color_midnight_background">
+    <ImageView
+        android:id="@+id/creator_photo"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:padding="@dimen/tv_safe_screen_gutter"
+        android:scaleType="fitCenter" android:contentDescription="Loading photo" />
+    <TextView
+        android:id="@+id/creator_photo_close"
+        android:layout_width="96dp" android:layout_height="48dp"
+        android:layout_gravity="top|end" android:layout_margin="@dimen/tv_safe_screen_gutter"
+        android:text="Close" android:textSize="16sp" android:fontFamily="sans-serif-medium"
+        android:gravity="center" android:includeFontPadding="false"
+        android:textColor="@color/color_warm_ivory_text" />
+</FrameLayout>
