@@ -2,6 +2,8 @@
 
 A native Android TV launcher for favorite apps, installed apps and TV inputs. No recommendations, ads, telemetry or network-dependent interface.
 
+![QuasarTV home screen on Android TV](docs/screenshots/home-emulator.png)
+
 ## Build
 
 Production build and signing on this workstation:
