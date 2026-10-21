@@ -28,3 +28,7 @@ keystore.properties
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local reverse-engineering evidence and design working files
+artifacts/
+.impeccable/

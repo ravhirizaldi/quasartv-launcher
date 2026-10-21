@@ -142,7 +142,7 @@ components:
 
 QuasarTV gives a viewer on a sofa a clear place to begin. Deep midnight space, slate app plates, warm ivory type, and a scarce ember accent make the focused app immediately legible. The open composition gives app identity room without introducing a recommendation feed or promotional imagery.
 
-Native Kotlin Views and XML define the system. Android system sans, original installed app banners and icons, and bounded focus motion keep the interface direct on an Android 9 television. User-authorized PatchWall source glyphs and header vectors retain their extracted geometry, with [asset provenance](artifacts/xiaomi-launcher/PROVENANCE.md). The full-width content and compact information header leave attention on the selected favorite.
+Native Kotlin Views and XML define the system. Android system sans, original installed app banners and icons, and bounded focus motion keep the interface direct on an Android 9 television. PatchWall source glyphs and header vectors retain their extracted geometry under the device owner's authorization; the original APK is not bundled. The full-width content and compact information header leave attention on the selected favorite.
 
 **Key Characteristics:**
 - Open dark space with a strong type hierarchy and recognizable app artwork.
@@ -206,7 +206,7 @@ Apps and Settings reserve the scroll-header gap below the information header. It
 
 Home is a fixed vertical LinearLayout, not a vertical scroller. Its hero takes the remaining height through a zero-height, weight-one region; the unframed artwork view matches that region's height, adjusts its width up to 264dp, and fits the source image against the shared right edge. Long titles remain within two ellipsized lines. Empty Home uses the same flexible region instead of a fixed-height empty container. Repeated Down on a source button must never move the page.
 
-The Favorites heading starts after a top margin (12dp). Its shelf has a viewport height (112dp), inset content (4dp vertically), fixed-width favorite tiles, and a final All apps tile. Every shelf tile, including All apps, has the trailing shelf gap; the terminal gap preserves the complete scaled outline at the scroll limit. The shelf viewport reserves horizontal focus padding (6dp per side). Focused favorites update the featured app; OK launches directly without a separate Open app control. The source-button strip sits below, without an Inputs heading. Only the two horizontal shelves scroll. The exact Home composition belongs to the [surface contract](.impeccable/surfaces/ava-com-quasartv-launcher-mainactivity-kt-3a2b7b1e.md).
+The Favorites heading starts after a top margin (12dp). Its shelf has a viewport height (112dp), inset content (4dp vertically), fixed-width favorite tiles, and a final All apps tile. Every shelf tile, including All apps, has the trailing shelf gap; the terminal gap preserves the complete scaled outline at the scroll limit. The shelf viewport reserves horizontal focus padding (6dp per side). Focused favorites update the featured app; OK launches directly without a separate Open app control. The source-button strip sits below, without an Inputs heading. Only the two horizontal shelves scroll. The exact Home composition follows the current layout resources.
 
 Apps displays every launchable app Android reports in a scrolling grid. It uses four columns unless both physical width reaches 1600px and logical width reaches 900dp, when it uses five. Relaxed and Compact preferences adjust horizontal gaps. Rows grow (190dp) when font scale exceeds 1.1; ordinary rows use the app-card height. Launcher Settings uses a single scrolling stack of content-sized rows with a minimum height (68dp). Inputs have no separate launcher destination.
 
@@ -254,7 +254,7 @@ Home shows every detected source below favorites, without an Inputs label. The h
 
 Sort active passthrough sources first, then hardware type and input ID. Prefer the TV's custom label, then its provider label. A source is active only when it supports passthrough and its state is exactly CONNECTED: its glyph and label use warm ivory and OK can activate it. All other detected sources remain grey and focusable with no click callback. Keep the reason in the spoken description, use the input ID as its stable tag, and point Down back to the same button so repeated Down cannot scroll or move Home. A connected tuner service alone does not establish supported passthrough switching.
 
-Native TvInputManager callbacks register while the launcher is visible. A standby callback changes tone and availability without removing the source; rediscovery can restore clickability. Empty/discovery failures remain in the source line; direct-switch failures can fall back to Android's available picker without adding an Inputs destination. Retain Quasar's slate surfaces and warm focus around the user-requested PatchWall button geometry; the [provenance record](artifacts/xiaomi-launcher/PROVENANCE.md) identifies the extracted package and asset bindings.
+Native TvInputManager callbacks register while the launcher is visible. A standby callback changes tone and availability without removing the source; rediscovery can restore clickability. Empty/discovery failures remain in the source line; direct-switch failures can fall back to Android's available picker without adding an Inputs destination. Retain Quasar's slate surfaces and warm focus around the user-requested PatchWall button geometry.
 
 ### Settings rows
 
@@ -266,7 +266,7 @@ The About card uses the shared slate surface and focus style, with a minimum hei
 
 The first nine clicks leave the card in place. The tenth opens the bundled portrait in a fullscreen native dialog and resets the counter. The fitted image keeps its aspect ratio within the screen gutter on a midnight background. Close sits at the top right (96 by 48dp), receives initial focus, and dismisses the viewer; Back also dismisses it and restores focus to the attached creator card.
 
-The user-supplied portrait is bundled offline as a bounded JPEG (539 by 720 pixels, 82,079 bytes including embedded metadata), with [download provenance](artifacts/creator-photo/source.json). One transient worker decodes it with RGB_565 preference and scaling disabled. Dismissal clears and recycles the displayed bitmap; a decode finishing after dismissal is recycled instead of being attached. This viewer requires no network permission or image dependency.
+The user-supplied portrait is bundled offline as a bounded JPEG (539 by 720 pixels, 82,079 bytes including embedded metadata). One transient worker decodes it with RGB_565 preference and scaling disabled. Dismissal clears and recycles the displayed bitmap; a decode finishing after dismissal is recycled instead of being attached. This viewer requires no network permission or image dependency.
 
 ### Feedback and exceptional states
 

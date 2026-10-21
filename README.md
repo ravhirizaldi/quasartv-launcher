@@ -42,7 +42,7 @@ Home uses the screen width without a sidebar, logo, launcher title or redundant 
 
 Input buttons appear only below favorites, without a separate Inputs label. Home uses a fixed vertical viewport; only the favorite and source shelves scroll horizontally. `TvInputManager` callbacks update source state/discovery while the launcher is visible. Custom input names come from Android TV, including PlayStation on the test TV. All detected sources remain visible. Connected switchable sources are active; standby, disconnected, unknown and unsupported sources are grey but remain focusable to inspect. OK on an inactive source does nothing. The tuner's always-connected service does not establish passthrough support. Direct passthrough switching uses Android's TV URI; verified input settings are a fallback when available.
 
-Input buttons use PatchWall's original HDMI/AV/TV glyphs and icon-over-label composition. Header info/settings are extracted native vector paths. Small copied resources work without PatchWall installed; no foreign APK or network UI is loaded. [Extraction evidence and provenance](artifacts/xiaomi-launcher/PROVENANCE.md).
+Input buttons use PatchWall's original HDMI/AV/TV glyphs and icon-over-label composition. Header info/settings are extracted native vector paths. Small copied resources work without PatchWall installed; no foreign APK or network UI is loaded. The original PatchWall APK and internal extraction notes are not distributed with this project.
 
 Launcher transient messages and toasts are removed. Discovery problems remain visible in the relevant screen; operation failures are logged. Favorites, appearance and focus use local preferences.
 
@@ -68,4 +68,4 @@ The command explicitly excludes streaming-app Back behavior: Apple TV retained f
 
 `./gradlew assembleDebugAndroidTest -PtestRunner=com.quasartv.launcher.HomeBackFocusTest` builds a focused, platform-only Back/Home regression runner. To instrument an installed release it must be signed with the same release certificate. It checks rapid Back pairs on favorites/inputs, header return, Settings return and repeated Home intents while recording every focus transition. App and input discovery run as separate background scans; unchanged results leave the current screen and focus untouched, and live input connection changes redraw only the source shelf. App labels and icons are cached until the package is updated. Pause/resume during an in-place Home intent does not rebuild the screen.
 
-See [implementation notes](artifacts/REDESIGN.md) and [physical TV validation](artifacts/xiaomi-tv/REPORT.md) for current screenshots, build output, memory measurements and limitations.
+See [DESIGN.md](DESIGN.md) for the interface and behavior notes.
